@@ -5,21 +5,8 @@ set -euo pipefail
 workdir="${workdir:-.workdir}"
 isofiles="${workdir}/CD1"
 
-RED=""
-GREEN=""
-RESET=""
-if [ -n "${TERM:-}" ] && [ -t 1 ] && command -v tput >/dev/null 2>&1; then
-  RED="$(tput setaf 1)$(tput bold)"
-  GREEN="$(tput setaf 2)$(tput bold)"
-  RESET="$(tput sgr0)"
-fi
-
-function progress() {
-  printf "%s -> %s%s\n" "$GREEN" "$1" "$RESET"
-}
-
 function extract_iso() {
-  progress "Extracting iso: $1..."
+  echo "Extracting iso: $1..."
   [ -e "$isofiles" ] && { chmod +w -R "$isofiles" && rm -fr "$isofiles"; }
   mkdir "$isofiles"
   xorriso -osirrox on -indev "$1" -extract / "$isofiles"
@@ -41,7 +28,7 @@ function copy_preseed() {
 }
 
 function add_preseed_to_initrd() {
-  progress "Adding '$1' to initrd..."
+  echo "Adding $1 to initrd..."
 
   install -d "$workdir/preseed"
   copy_preseed "$1" "$workdir/preseed"
@@ -60,7 +47,6 @@ function add_preseed_to_initrd() {
 }
 
 function add_static_to_cdrom() {
-  progress "Adding ./static content to ISO /preseed..."
 
   local static
   static="./cdrom"
@@ -73,7 +59,7 @@ function add_static_to_cdrom() {
 }
 
 function make_auto_the_default_isolinux_boot_option() {
-  progress "Setting 'auto' as default ISOLINUX boot entry..."
+  echo "Setting 'auto' as default ISOLINUX boot entry..."
 
   # shellcheck disable=SC2016
   sed -e 's/timeout 0/timeout 3/g' -e '$adefault auto' \
@@ -85,7 +71,7 @@ function make_auto_the_default_isolinux_boot_option() {
 }
 
 function make_auto_the_default_grub_boot_option() {
-  progress "Setting 'auto' as default GRUB boot entry..."
+  echo "Setting 'auto' as default GRUB boot entry..."
 
   # The index for the grub menus is zero-based for the
   # Root menu, but 1-based for the rest, so 2>5 is the
@@ -100,7 +86,7 @@ function make_auto_the_default_grub_boot_option() {
 }
 
 function update_md5_checksum() {
-  progress "Recalculating MD5 checksum for ISO verification..."
+  echo "Recalculating MD5 checksum for ISO verification..."
   rm -f "$isofiles/md5sum.txt"
   chmod +w "$isofiles/.disk"
   rm -f "$isofiles/.disk/mkisofs"
@@ -138,9 +124,9 @@ function generate_new_iso() {
   local orig_iso="$1"
   local new_iso="$2"
 
-  progress "Generating new iso: $new_iso..."
-  progress " -- ignore the warning about a 'file system loop' below"
-  progress " -- ignore warnings about symlinks for Joliet, they are created for RockRidge"
+  echo "Generating new iso: $new_iso..."
+  echo " -- ignore the warning about a 'file system loop' below"
+  echo " -- ignore warnings about symlinks for Joliet, they are created for RockRidge"
 
   [ -e "$new_iso" ] && rm -f "$new_iso"
   dd if="$orig_iso" bs=432 count=1 of="$workdir/mbr_template.bin" status=none
@@ -151,7 +137,7 @@ function generate_new_iso() {
 }
 
 function cleanup() {
-  progress "cleanup ..."
+  echo "cleanup ..."
   chmod +w "$workdir" -R
   rm -rf "$workdir"
 }
@@ -177,7 +163,7 @@ function check_program_installed() {
   command -v "$1" 2>/dev/null >&2 && return 0
   if [ -t 2 ]; then
     printf >&2 "%s%s: command not found, please install package %s%s\n" \
-      "$RED" "$1" "${2:$1}" "$RESET"
+           "$1" "${2:$1}"
   else
     printf >&2 "%s: command not found, please install package %s\n" \
       "$1" "${2:$1}"
@@ -202,7 +188,7 @@ function ensure_file_presence() {
 
 function die() {
   if [ -t 2 ]; then
-    printf >&2 "%s%s%s\n" "$RED" "$1" "$RESET"
+    printf >&2 "%s%s%s\n" "$1"
   else
     printf >&2 "%s\n" "$1"
   fi
@@ -234,8 +220,8 @@ preseed_cfg="${preseed_cfg:-preseed.cfg}"
 new_iso="${new_iso:-preseed-$(basename "$orig_iso")}"
 force="${force:-}"
 
-progress "source: $orig_iso"
-progress "dest  : $new_iso"
+echo "source: $orig_iso"
+echo "dest  : $new_iso"
 
 ensure_file_presence "$orig_iso"
 if [ -d "$preseed_cfg" ]; then
@@ -258,4 +244,4 @@ update_md5_checksum
 generate_new_iso "$orig_iso" "$new_iso"
 cleanup
 
-progress "${new_iso}: DONE"
+echo "${new_iso}: DONE"
