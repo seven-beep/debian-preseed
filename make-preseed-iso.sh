@@ -147,13 +147,13 @@ function usage() {
   if [ "${1-0}" -ne 0 ]; then
     exec >&2
   fi
-  printf "Usage: %s [-p preseed.cfg|preseed/] [-o preseed-debian-image.iso] [-f] path/to/debian-image.iso\n" "$(basename "$0")"
+  printf "Usage: %s path/to/debian.iso [-p preseed.cfg] [-o preseed-debian.iso] [-f]\n" "$(basename "$0")"
   printf "\n"
-  printf "  -p preseed.cfg|preseed_dir\n"
+  printf "  -p|--preseed preseed.cfg|preseed_dir\n"
   printf "      Use this file as preseed.cfg, or a directory with preseed.cfg inside\n"
-  printf "  -o preseed-debian-image.iso\n"
+  printf "  -o|--output preseed-debian-image.iso\n"
   printf "      Save ISO to this name, default is to prefix ISO source name with \"preseed-\"\n"
-  printf "  -f\n"
+  printf "  -f|--force\n"
   printf "      Force overwriting output file. Default is to fail if output file exists.\n"
   if [ "${1:-0}" -ge "0" ]; then
     exit "${1:-0}"
@@ -162,13 +162,8 @@ function usage() {
 
 function check_program_installed() {
   command -v "$1" 2>/dev/null >&2 && return 0
-  if [ -t 2 ]; then
-    printf >&2 "%s%s: command not found, please install package %s%s\n" \
-           "$1" "${2:$1}"
-  else
-    printf >&2 "%s: command not found, please install package %s\n" \
-      "$1" "${2:$1}"
-  fi
+  printf >&2 "%s: command not found, please install package %s\n" \
+         "$1" "${2:-$1}"
   return 1
 }
 
@@ -188,28 +183,28 @@ function ensure_file_presence() {
 }
 
 function die() {
-  if [ -t 2 ]; then
-    printf >&2 "%s%s%s\n" "$1"
-  else
-    printf >&2 "%s\n" "$1"
-  fi
+  printf >&2 "%s\n" "$1"
   exit 1
 }
+
+short='hfo:p:'
+long='help,force,output:,preseed:'
+opts=$(getopt --options=$short --longoptions=$long --name "$0" -- "$@")
+[[ -n "$opts" ]] && eval set -- "$opts"
+
+while true; do
+  case "$1" in
+    -h|--help) usage ; shift ;;
+    -f|--force) force="yes" ; shift ;;
+    -o|--output) new_iso="${OPTARG}" ; shift 2 ;;
+    -p|--preseed) preseed_cfg="${OPTARG}" ; shift 2 ;;
+    *) usage 1 ;;
+  esac
+done
 
 if ! check_requirements; then
   die "** ERROR: missing installed programs, cannot continue"
 fi
-
-while getopts "fho:p:" arg; do
-  case $arg in
-  h) usage ;;
-  f) force="yes" ;;
-  o) new_iso="${OPTARG}" ;;
-  p) preseed_cfg="${OPTARG}" ;;
-  *) usage 1 ;;
-  esac
-done
-shift $((OPTIND - 1))
 
 if [ -z "${1-}" ]; then
   usage -1
