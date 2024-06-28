@@ -86,6 +86,17 @@ function make_auto_the_default_grub_boot_option() {
   chmod -w "$isofiles/boot/grub/grub.cfg"
 }
 
+function include_grub_debug_flag() {
+  if [[ "$debug" == True ]] ; then
+    echo "Setting DEBCONF_DEBUG=5 in kernel command line..."
+    chmod +w "$isofiles/boot/grub/"
+    chmod +w "$isofiles/boot/grub/grub.cfg"
+    sed -i 's/---/DEBCONF_DEBUG=5 ---/g' "$isofiles/boot/grub/grub.cfg"
+    chmod -w "$isofiles/boot/grub/"
+    chmod -w "$isofiles/boot/grub/grub.cfg"
+  fi
+}
+
 function update_md5_checksum() {
   echo "Recalculating MD5 checksum for ISO verification..."
   rm -f "$isofiles/md5sum.txt"
@@ -187,17 +198,19 @@ function die() {
   exit 1
 }
 
-short='hfo:p:'
-long='help,force,output:,preseed:'
+short='hdfo:p:'
+long='help,debug,force,output:,preseed:'
 opts=$(getopt --options=$short --longoptions=$long --name "$0" -- "$@")
 [[ -n "$opts" ]] && eval set -- "$opts"
 
 while true; do
   case "$1" in
     -h|--help) usage ; shift ;;
-    -f|--force) force="yes" ; shift ;;
-    -o|--output) new_iso="${OPTARG}" ; shift 2 ;;
-    -p|--preseed) preseed_cfg="${OPTARG}" ; shift 2 ;;
+    -d|--debug) debug=True ; shift ;;
+    -f|--force) force=True ; shift ;;
+    -o|--output) new_iso="${2}" ; shift 2 ;;
+    -p|--preseed) preseed_cfg="${2}" ; shift 2 ;;
+    --) shift ; break ;;
     *) usage 1 ;;
   esac
 done
@@ -215,6 +228,7 @@ orig_iso="$1"
 preseed_cfg="${preseed_cfg:-preseed.cfg}"
 new_iso="${new_iso:-preseed-$(basename "$orig_iso")}"
 force="${force:-}"
+debug="${debug:-}"
 
 echo "source: $orig_iso"
 echo "dest  : $new_iso"
@@ -225,7 +239,7 @@ if [ -d "$preseed_cfg" ]; then
 else
   ensure_file_presence "$preseed_cfg"
 fi
-if [ "$force" != "yes" ] && [ -e "$new_iso" ]; then
+if [ "$force" != True ] && [ -e "$new_iso" ]; then
   die "${new_iso}: already exist, use -f to silently overwrite"
 fi
 
@@ -236,6 +250,7 @@ add_preseed_to_initrd "$preseed_cfg"
 add_static_to_cdrom
 make_auto_the_default_isolinux_boot_option
 make_auto_the_default_grub_boot_option
+include_grub_debug_flag
 update_md5_checksum
 generate_new_iso "$orig_iso" "$new_iso"
 cleanup
