@@ -1,10 +1,11 @@
-#!/bin/sh -x
+#!/bin/sh
 #
 # This script is meant to be run as preseed/late_command.
 #
 # It does not use in-target as I found it unreliable to successfully end the installation.
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=610525
 # chroot may be an option if commands need to be run from the target system.
+set -ex
 
 logger Executing late_command.sh
 

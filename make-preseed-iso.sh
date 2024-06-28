@@ -64,7 +64,7 @@ EOF
 }
 
 function build_hostname_cfg() {
-  if [[ -n "$hostname" ]] ; then
+  if [[ -v hostname ]] ; then
     cat >> "$workdir/preseed/preseed.cfg" <<EOF
 # Hostname
 d-i netcfg/hostname string $hostname
@@ -75,10 +75,50 @@ EOF
 
 function build_domain_cfg() {
   # Domain is null if not set.
-  echo >> "$workdir/preseed/preseed.cfg" <<EOF
+  cat >> "$workdir/preseed/preseed.cfg" <<EOF
 # domain
 d-i netcfg/get_domain string $domain
 EOF
+}
+
+function build_users() {
+  cat >> "$workdir/preseed/preseed.cfg" <<EOF
+# USERS
+EOF
+  if [[ "$without_root" != False ]]; then
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i passwd/root-login boolean True
+EOF
+    if [[ -z "$root_sha512" ]]; then
+      root_sha512=$(openssl passwd -6 -noverify)
+    fi
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i passwd/root-password-crypted password $root_sha512
+EOF
+
+    # Assuming you want the same full name as your login,
+    # Assuming you want uid 1000,
+    # Assuming you do not require groups :
+    # d-i passwd/user-default-groups string [groups]
+    if [[ -n "$user" ]]; then
+      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string $user
+d-i passwd/username string $user
+d-i passwd/user-uid string 1000
+EOF
+      if [[ -z "$user_sha512" ]]; then
+        user_sha512=$(openssl passwd -6 -noverify)
+      fi
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i passwd/root-password-crypted password $user_sha512
+EOF
+    else
+      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i passwd/make-user boolean false
+EOF
+    fi
+  fi
 }
 
 function add_to_initrd() {
@@ -233,7 +273,6 @@ function check_program_installed() {
 function check_requirements() {
   local ok=0
   check_program_installed dd coreutils || ok=1
-  check_program_installed envsubst gettext || ok=1
   check_program_installed gzip || ok=1
   check_program_installed cpio || ok=1
   check_program_installed xorriso || ok=1
@@ -251,25 +290,78 @@ function die() {
   exit 1
 }
 
-short='hdfo:p:si:n:g:N:H:D:'
-long='help,debug,force,output:,preseed:,ip-address:,netmask:,gateway:,nameservers:,hostname:,domain:'
+function usage() {
+  if [ "${1-0}" -ne 0 ]; then
+    exec >&2
+  fi
+  cat <<EOF
+Usage: $(basename "$0") path/to/debian.iso [-p preseed.cfg] [-o preseed-debian.iso] [-f]
+
+  -h|--help
+      Print this message.
+  -d|--debug
+      Enable debconf debugging log level in the generated iso.
+  -p|--preseed preseed.cfg|preseed_dir
+      Use this file as preseed.cfg, or a directory with preseed.cfg inside.
+  -o|--output preseed-debian-image.iso
+      Save ISO to this name, default is to prefix ISO source name with "preseed-".
+  -f|--force
+      Force overwriting output file. Default is to fail if output file exists.
+  -s|--static-network
+      Disable DHCP discovery
+  -i|--ip-address
+      Set the ip address
+  -n|--netmask
+      Set the netmask
+  -g|--gateway
+      Set the gateway
+  -N|--nameservers
+      Set the nameservers
+  -H|--hostname
+      Set the hostname
+  -D|--domain
+      Set the domain. If no domain is provided, no domain will be configured.
+  -u|--user
+      Set the username of the user created.
+  -w|--without-root
+      Weither or not setting a password on root user.
+
+  All options can be set via environment variables.
+
+  Notably root_sha512 and user_sha512 can be set from the environment and be
+  used as crypted password information.
+
+  To generate them, use:
+    # openssl passwd -6
+
+EOF
+  if [ "${1:-0}" -ge "0" ]; then
+    exit "${1:-0}"
+  fi
+}
+
+
+short='hdp:o:fsi:n:g:N:H:D:u:w'
+long='help,debug,preseed:,output:,force,ip-address:,netmask:,gateway:,nameservers:,hostname:,domain:,user:,without-root'
 opts=$(getopt --options=$short --longoptions=$long --name "$0" -- "$@")
 [[ -n "$opts" ]] && eval set -- "$opts"
 
 while true; do
   case "$1" in
-    -h|--help)           usage               ; shift   ;;
-    -d|--debug)          debug=True          ; shift   ;;
-    -f|--force)          force=True          ; shift   ;;
-    -o|--output)         new_iso="${2}"      ; shift 2 ;;
-    -p|--preseed)        preseed_cfg="${2}"  ; shift 2 ;;
-    -s|--static-network) static_network=True ; shift   ;;
-    -i|--ip-address)     ip_address=$2       ; shift 2 ;;
-    -n|--netmask)        netmask=$2          ; shift 2 ;;
-    -g|--gateway)        gateway=$2          ; shift 2 ;;
-    -N|--nameservers)    nameservers=$2      ; shift 2 ;;
-    -H|--hostname)       hostname=$2         ; shift 2 ;;
-    -D|--domain)         domain=$2           ; shift 2 ;;
+    -h|--help)            usage               ; shift   ;;
+    -d|--debug)           debug=True          ; shift   ;;
+    -f|--force)           force=True          ; shift   ;;
+    -o|--output)          new_iso="${2}"      ; shift 2 ;;
+    -p|--preseed)         preseed_cfg="${2}"  ; shift 2 ;;
+    -s|--static-network)  static_network=True ; shift   ;;
+    -i|--ip-address)      ip_address=$2       ; shift 2 ;;
+    -n|--netmask)         netmask=$2          ; shift 2 ;;
+    -g|--gateway)         gateway=$2          ; shift 2 ;;
+    -N|--nameservers)     nameservers=$2      ; shift 2 ;;
+    -H|--hostname)        hostname=$2         ; shift 2 ;;
+    -D|--domain)          domain=$2           ; shift 2 ;;
+    -u|--user)            user=$2             ; shift 2 ;;
+    -w|--without-root)    without_root=True   ; shift   ;;
     --) shift ; break ;;
     *) usage 1 ;;
   esac
@@ -296,6 +388,10 @@ gateway="${gateway:-}"
 nameservers="${nameservers:=9.9.9.9}"
 hostname="${hostname:-}"
 domain="${domain:=}"
+user="${user:-}"
+user_sha512="${user_sha512:-}"
+without_root="${root:-}"
+root_sha512="${root_sha512:-}"
 
 echo "source: $orig_iso"
 echo "dest  : $new_iso"
@@ -317,6 +413,7 @@ init_workdir  "$preseed_cfg"
 build_network_cfg
 build_hostname_cfg
 build_domain_cfg
+build_users
 add_to_initrd "$preseed_cfg"
 make_auto_the_default_isolinux_boot_option
 make_auto_the_default_grub_boot_option
