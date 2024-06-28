@@ -47,16 +47,18 @@ function add_preseed_to_initrd() {
   chmod -w -R "$isofiles/install.amd/"
 }
 
-function add_static_to_cdrom() {
-
-  local static
-  static="./cdrom"
-  install -d -m 755 "$isofiles/preseed"
-  (
-    cd "$static"
-    find . -name \* -a ! \( -name \*~ -o -name \*.bak -o -name \*.orig \) -print0
-  ) | cpio -v -p -L -0 -D "$static" "$isofiles/preseed"
-  chmod -w -R "$isofiles/preseed"
+function add_directory_to_cdrom() {
+  local dir
+  dir="$1"
+  if [[ -d "$dir" ]] ; then
+    echo "Adding $dir content to ISO /$dir..."
+    install -d -m 755 "$isofiles/$dir"
+    (
+      cd "$1"
+      find . -name \* -a ! \( -name \*~ -o -name \*.bak -o -name \*.orig \) -print0
+    ) | cpio -v -p -L -0 -D "$dir" "$isofiles/$dir"
+    chmod -w -R "$isofiles/$dir"
+  fi
 }
 
 function make_auto_the_default_isolinux_boot_option() {
@@ -247,7 +249,11 @@ install -m 0755 -d "$workdir"
 
 extract_iso "$orig_iso"
 add_preseed_to_initrd "$preseed_cfg"
-add_static_to_cdrom
+
+for dir in scripts partman private ; do
+  add_directory_to_cdrom "$dir"
+done
+
 make_auto_the_default_isolinux_boot_option
 make_auto_the_default_grub_boot_option
 include_grub_debug_flag

@@ -1,0 +1,85 @@
+cis ::
+512 512 512 ext4
+        $primary{ } $bootable{ }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /boot }
+.
+
+21475 42949 -1 ext4 vg_name{ vg_root }
+        $primary{ } $defaultignore{ }
+        method{ lvm }
+.
+
+4295 7517 10738 ext4 lv_name{ root }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ / }
+.
+
+4295 4295 4295 linux-swap lv_name{ swap }
+        $lvmok{ } in_vg{ vg_root }
+        method{ swap } format{ }
+.
+
+3222 4295 5369 ext4 lv_name{ var }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /var }
+        options/nodev{ nodev }
+.
+
+3222 4295 5369 ext4 lv_name{ var_log }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /var/log }
+        options/nodev{ nodev }
+        options/noexec{ noexec }
+        options/nosuid{ nosuid }
+.
+
+3222 4295 5369 ext4 lv_name{ var_log_audit }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /var/log/audit }
+        options/nodev{ nodev }
+        options/noexec{ noexec }
+        options/nosuid{ nosuid }
+.
+
+3222 4295 5369 ext4 lv_name{ var_tmp }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /var/tmp }
+        options/nodev{ nodev }
+        options/noexec{ noexec }
+        options/nosuid{ nosuid }
+.
+
+1078 1610 2148 ext4 lv_name{ opt }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /opt }
+.
+
+1078 1610 2148 ext4 lv_name{ home }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /home }
+        options/nodev{ nodev }
+        options/nosuid{ nosuid }
+.
+
+100 100 100 ext4 lv_name{ dummy }
+        $lvmok{ } in_vg{ vg_root }
+        method{ format } format{ }
+        use_filesystem{ } filesystem{ ext4 }
+        mountpoint{ /dummy }
+.

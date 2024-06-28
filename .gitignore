@@ -6,3 +6,4 @@
 
 *.iso
 /.workdir/
+/private/
