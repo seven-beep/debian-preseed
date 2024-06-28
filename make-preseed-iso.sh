@@ -13,26 +13,27 @@ function extract_iso() {
   xorriso -osirrox on -indev "$1" -extract / "$isofiles"
 }
 
-function copy_preseed_dir() {
-  (
-    cd "$1"
-    find . -name \* -a ! \( -name \*~ -o -name \*.bak -o -name \*.orig \) -print0
-  ) | cpio -v -p -L -0 -D "$1" "$2"
-}
+function init_workdir() {
+  install -d "$workdir/preseed"
 
-function copy_preseed() {
   if [ -d "$1" ]; then
-    copy_preseed_dir "$1" "$2"
+    install "$1/preseed.cfg" "$workdir/preseed/preseed.cfg"
+    (
+      cd "$1"
+      find . -name \* -a ! \( -name \*~ -o -name \*.bak -o -name \*.orig \) -print0
+    ) | cpio -v -p -L -0 -D "$1" "$workdir"
   else
-    install "$1" "$2/preseed.cfg"
+    install "$1" "$workdir/preseed/preseed.cfg"
   fi
+
+  find common private -name \* -a ! \( -name \*~ -o -name \*.bak -o -name \*.orig \) -print0 \
+    | cpio -v -p -L -0 -d "$workdir/preseed/"
 }
 
-function add_preseed_to_initrd() {
+function add_to_initrd() {
   echo "Adding $1 to initrd..."
 
-  install -d "$workdir/preseed"
-  copy_preseed "$1" "$workdir/preseed"
+  init_workdir "$1"
 
   chmod +w -R "$isofiles/install.amd/"
   gunzip "$isofiles/install.amd/initrd.gz"
@@ -183,6 +184,7 @@ function check_program_installed() {
 function check_requirements() {
   local ok=0
   check_program_installed dd coreutils || ok=1
+  check_program_installed envsubst gettext || ok=1
   check_program_installed gzip || ok=1
   check_program_installed cpio || ok=1
   check_program_installed xorriso || ok=1
@@ -246,19 +248,12 @@ if [ "$force" != True ] && [ -e "$new_iso" ]; then
 fi
 
 install -m 0755 -d "$workdir"
-
-extract_iso "$orig_iso"
-add_preseed_to_initrd "$preseed_cfg"
-
-for dir in scripts partman private ; do
-  add_directory_to_cdrom "$dir"
-done
-
+#extract_iso "$orig_iso"
+add_to_initrd "$preseed_cfg"
 make_auto_the_default_isolinux_boot_option
 make_auto_the_default_grub_boot_option
 include_grub_debug_flag
 update_md5_checksum
 generate_new_iso "$orig_iso" "$new_iso"
-cleanup
-
+#cleanup
 echo "${new_iso}: DONE"
