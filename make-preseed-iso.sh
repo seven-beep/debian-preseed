@@ -14,6 +14,7 @@ function extract_iso() {
 }
 
 function init_workdir() {
+  install -m 0755 -d "$workdir"
   install -d "$workdir/preseed"
 
   if [ -d "$1" ]; then
@@ -30,10 +31,58 @@ function init_workdir() {
     | cpio -v -p -L -0 -d "$workdir/preseed/"
 }
 
+function validate_network_options() {
+  if [[ -n "$ip_address" ]] \
+  || [[ -n "$netmask"    ]] \
+  || [[ -n "$gateway"    ]] ; then
+    if [[ -z "$ip_address" ]] \
+    || [[ -z "$netmask"    ]] \
+    || [[ -z "$gateway"    ]] ; then
+      die "Missing network information"
+    fi
+  fi
+}
+
+function build_network_cfg() {
+  # I am assuming you do not want a static dhcp.
+  if [[ -n "$ip_address" ]] ; then
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+# Static Network :
+d-i netcfg/disable_autoconfig boolean true
+d-i netcfg/get_ipaddress string $ip_address
+d-i netcfg/get_netmask string $netmask
+d-i netcfg/get_gateway string $gateway
+d-i netcfg/get_nameservers string $nameservers
+d-i netcfg/confirm_static boolean true
+EOF
+  elif [[ "$static_network" == True ]]; then
+      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+# Static Network :
+d-i netcfg/disable_autoconfig boolean true
+EOF
+  fi
+}
+
+function build_hostname_cfg() {
+  if [[ -n "$hostname" ]] ; then
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+# Hostname
+d-i netcfg/hostname string $hostname
+d-i netcfg/get_hostname string $hostname
+EOF
+  fi
+}
+
+function build_domain_cfg() {
+  # Domain is null if not set.
+  echo >> "$workdir/preseed/preseed.cfg" <<EOF
+# domain
+d-i netcfg/get_domain string $domain
+EOF
+}
+
 function add_to_initrd() {
   echo "Adding $1 to initrd..."
-
-  init_workdir "$1"
 
   chmod +w -R "$isofiles/install.amd/"
   gunzip "$isofiles/install.amd/initrd.gz"
@@ -202,18 +251,25 @@ function die() {
   exit 1
 }
 
-short='hdfo:p:'
-long='help,debug,force,output:,preseed:'
+short='hdfo:p:si:n:g:N:H:D:'
+long='help,debug,force,output:,preseed:,ip-address:,netmask:,gateway:,nameservers:,hostname:,domain:'
 opts=$(getopt --options=$short --longoptions=$long --name "$0" -- "$@")
 [[ -n "$opts" ]] && eval set -- "$opts"
 
 while true; do
   case "$1" in
-    -h|--help) usage ; shift ;;
-    -d|--debug) debug=True ; shift ;;
-    -f|--force) force=True ; shift ;;
-    -o|--output) new_iso="${2}" ; shift 2 ;;
-    -p|--preseed) preseed_cfg="${2}" ; shift 2 ;;
+    -h|--help)           usage               ; shift   ;;
+    -d|--debug)          debug=True          ; shift   ;;
+    -f|--force)          force=True          ; shift   ;;
+    -o|--output)         new_iso="${2}"      ; shift 2 ;;
+    -p|--preseed)        preseed_cfg="${2}"  ; shift 2 ;;
+    -s|--static-network) static_network=True ; shift   ;;
+    -i|--ip-address)     ip_address=$2       ; shift 2 ;;
+    -n|--netmask)        netmask=$2          ; shift 2 ;;
+    -g|--gateway)        gateway=$2          ; shift 2 ;;
+    -N|--nameservers)    nameservers=$2      ; shift 2 ;;
+    -H|--hostname)       hostname=$2         ; shift 2 ;;
+    -D|--domain)         domain=$2           ; shift 2 ;;
     --) shift ; break ;;
     *) usage 1 ;;
   esac
@@ -233,6 +289,13 @@ preseed_cfg="${preseed_cfg:-preseed.cfg}"
 new_iso="${new_iso:-preseed-$(basename "$orig_iso")}"
 force="${force:-}"
 debug="${debug:-}"
+static_network="${static_network:-}"
+ip_address="${ip_address:-}"
+netmask="${netmask:-}"
+gateway="${gateway:-}"
+nameservers="${nameservers:=9.9.9.9}"
+hostname="${hostname:-}"
+domain="${domain:=}"
 
 echo "source: $orig_iso"
 echo "dest  : $new_iso"
@@ -247,8 +310,13 @@ if [ "$force" != True ] && [ -e "$new_iso" ]; then
   die "${new_iso}: already exist, use -f to silently overwrite"
 fi
 
-install -m 0755 -d "$workdir"
+
+validate_network_options
 #extract_iso "$orig_iso"
+init_workdir  "$preseed_cfg"
+build_network_cfg
+build_hostname_cfg
+build_domain_cfg
 add_to_initrd "$preseed_cfg"
 make_auto_the_default_isolinux_boot_option
 make_auto_the_default_grub_boot_option
