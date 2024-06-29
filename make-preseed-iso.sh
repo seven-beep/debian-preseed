@@ -246,23 +246,6 @@ function cleanup() {
   rm -rf "$workdir"
 }
 
-function usage() {
-  if [ "${1-0}" -ne 0 ]; then
-    exec >&2
-  fi
-  printf "Usage: %s path/to/debian.iso [-p preseed.cfg] [-o preseed-debian.iso] [-f]\n" "$(basename "$0")"
-  printf "\n"
-  printf "  -p|--preseed preseed.cfg|preseed_dir\n"
-  printf "      Use this file as preseed.cfg, or a directory with preseed.cfg inside\n"
-  printf "  -o|--output preseed-debian-image.iso\n"
-  printf "      Save ISO to this name, default is to prefix ISO source name with \"preseed-\"\n"
-  printf "  -f|--force\n"
-  printf "      Force overwriting output file. Default is to fail if output file exists.\n"
-  if [ "${1:-0}" -ge "0" ]; then
-    exit "${1:-0}"
-  fi
-}
-
 function check_program_installed() {
   command -v "$1" 2>/dev/null >&2 && return 0
   printf >&2 "%s: command not found, please install package %s\n" \
@@ -350,9 +333,9 @@ while true; do
   case "$1" in
     -h|--help)            usage               ; shift   ;;
     -d|--debug)           debug=True          ; shift   ;;
-    -f|--force)           force=True          ; shift   ;;
-    -o|--output)          new_iso="${2}"      ; shift 2 ;;
     -p|--preseed)         preseed_cfg="${2}"  ; shift 2 ;;
+    -o|--output)          new_iso="${2}"      ; shift 2 ;;
+    -f|--force)           force=True          ; shift   ;;
     -s|--static-network)  static_network=True ; shift   ;;
     -i|--ip-address)      ip_address=$2       ; shift 2 ;;
     -n|--netmask)         netmask=$2          ; shift 2 ;;
