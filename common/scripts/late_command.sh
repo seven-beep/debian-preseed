@@ -7,22 +7,22 @@
 # chroot may be an option if commands need to be run from the target system.
 set -ex
 
-logger Executing late_command.sh
+logger "Executing late_command.sh"
 
 if command -v lvs > /dev/null; then
 
    if lvs | grep dummy -q ; then
-       logger Remove the dummy volume
+       logger "Remove the dummy volume"
+       # Notice that the lv dummy should not have a mount point,
+       # Otherwise we should also patch /etc/fstab.
        VG=$(lvs | grep dummy | awk '{ print $2 }')
-       for vg in "$VG" ; do
-           umount "/dev/$vg/dummy"
+       for vg in $VG ; do
            lvremove -y "/dev/$vg/dummy"
-           sed -ri "s|^/dev/mapper/$vg-dummy.*||" /target/etc/fstab
        done
    fi
 
    if lvs | awk '{ print $2 }' | grep -Evq '^var$'; then
-       logger Enable and configure a tmpfs for /tmp as it was not partitionned
+       logger "Enable and configure a tmpfs for /tmp as it was not partitionned"
        cp -v /target/usr/share/systemd/tmp.mount /target/etc/systemd/system/tmp.mount
        # Enforce noexec on /tmp
        sed -ri 's/(Options.*)/\1,noexec/' /target/etc/systemd/system/tmp.mount
@@ -31,28 +31,47 @@ if command -v lvs > /dev/null; then
    fi
 fi
 
-logger Enforcing https in /target/etc/apt/sources.list
+logger "Enforcing https in /target/etc/apt/sources.list"
 sed -i 's|http://|https://|g' /target/etc/apt/sources.list
 
-# The installed should may have created only one user, so at this point,
-# it seems safe to assume that:
-user=$(ls /home)
+# Aprioris, there is only one user in /home right now.
+user=$(awk -F':' '$6 ~ "^/home" { print $1 }' /etc/passwd)
 
-if [[ -f /private/authorized_keys ]]; then
-    logger Setting up authorized_keys
+if [ -f /private/authorized_keys ]; then
+    logger "Setting up authorized_keys"
 
     # Assuming that you want the keys in for your user if you created it,
     # or for root if you didn't created it.
-    if [[ -n "$user" ]]; then
-        mkdir -p "/home/$user/.ssh"
-        chmod 700 "/home/$user/.ssh"
-        mv /private/authorized_keys "/home/$user/.ssh/"
-        chmod 600 "/home/$user/.ssh/authorized_keys"
-        chown "$user:$user" -R "/home/$user/.ssh"
+    if [ -n "$user" ]; then
+        mkdir --parent --verbose --directory "/target/home/$user/.ssh"
+        chmod 0700 "/target/home/$user/.ssh"
+        mv --verbose /private/authorized_keys "/target/home/$user/.ssh/"
+        chmod 0600 "/target/home/$user/.ssh/"
+        chown "$user:$user" -R "/target/home/$user/.ssh"
+        logger "Enabling passwordless sudo for $user"
+        echo "$user ALL=(ALL) NOPASSWD: ALL" >  "/target/etc/sudoers.d/$user";
     else
-        mkdir -p /root/.ssh
-        chmod 700 /root/.ssh
-        mv /private/authorized_keys /root/.ssh/
-        chmod 600 /root/.ssh/authorized_keys
+        mkdir --parent --verbose /target/root/.ssh
+        chmod 0700 /target/root/.ssh
+        mv --verbose /private/authorized_keys /target/root/.ssh/authorized_keys
+        chmod 0600 /target/root/.ssh/authorized_keys
     fi
+fi
+
+if [ -f /private/default/keyboard ]; then
+    logger "Reconfiguring keyboard"
+    mv --verbose /private/default/keyboard /target/etc/default/keyboard
+    in-target dpkg-reconfigure --frontend noninteractive keyboard-configuration
+fi
+
+if [ -f /private/default/console-setup ]; then
+    logger "Reconfiguring console-setup"
+    mv --verbose /private/default/console-setup /target/etc/default/console-setup
+    in-target dpkg-reconfigure --frontend noninteractive console-setup
+fi
+
+if [ -f /private/default/grub ]; then
+    logger "Reconfiguring grub"
+    mv --verbose /private/default/grub /target/etc/default/grub
+    in-target update-grub
 fi
