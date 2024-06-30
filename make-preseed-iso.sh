@@ -278,7 +278,7 @@ function usage() {
     exec >&2
   fi
   cat <<EOF
-Usage: $(basename "$0") path/to/debian.iso [-p preseed.cfg] [-o preseed-debian.iso] [-f]
+Usage: $(basename "$0") path/to/debian.iso
 
   -h|--help
       Print this message.
