@@ -1,0 +1,154 @@
+
+* Generate Debian 12 non-interactive ISO images with [[https://www.debian.org/releases/stable/amd64/apb.en.html][preseed.cfg]]
+
+Forked from [[https://github.com/lboulard/debian-preseed][jboulard]], which forked it from [[https://github.com/JaeGerW2016/debian_11-bullseye-preseed][JaeGerW2016]].
+
+Changes in 2024: I reorganized the file hierarchy, separated configurations from
+partman recipes, implemented new CLI options and the late_command.sh script,
+modified the files included into the initdr.
+
+* Requirements
+
+Tools `cpio`, `gzip` and `xorriso` are required by `make-preseed-iso.sh` script.
+
+#+begin_src bash :exports code
+sudo apt install gzip cpio xorriso
+#+end_src
+
+* Command line usage
+
+#+begin_src bash :results pp :exports both
+./make-preseed-iso.sh --help
+#+end_src
+
+#+RESULTS:
+#+begin_example
+Usage: make-preseed-iso.sh path/to/debian.iso
+
+  -h|--help
+      Print this message.
+  -d|--debug
+      Enable debconf debugging log level in the generated iso.
+  -p|--preseed preseed.cfg|preseed_dir
+      Use this file as preseed.cfg, or a directory with preseed.cfg inside.
+  -o|--output preseed-debian-image.iso
+      Save ISO to this name, default is to prefix ISO source name with "preseed-".
+  -f|--force
+      Force overwriting output file. Default is to fail if output file exists.
+  -s|--static-network
+      Disable DHCP discovery
+  -i|--ip-address
+      Set the ip address
+  -n|--netmask
+      Set the netmask
+  -g|--gateway
+      Set the gateway
+  -N|--nameservers
+      Set the nameservers
+  -H|--hostname
+      Set the hostname
+  -D|--domain
+      Set the domain. If no domain is provided, no domain will be configured.
+  -u|--user
+      Set the username of the user created.
+  -w|--without-root
+      Weither or not setting a password on root user.
+
+  All options can be set via environment variables.
+
+  Notably root_sha512 and user_sha512 have no CLI flags but can be used as
+  crypted password information.
+
+  To generate them, use:
+    # openssl passwd -6
+
+#+end_example
+
+* Usage
+
+Quick instructions to create network installer ISO images with preseed files.
+
+** Download a netinst image:
+
+#+begin_src bash
+wget https://cdimage.debian.org/cdimage/release/current/amd64/iso-cd/debian-12.6.0-amd64-netinst.iso
+wget https://cdimage.debian.org/cdimage/release/current/amd64/iso-cd/SHA256SUMS
+wget https://cdimage.debian.org/cdimage/release/current/amd64/iso-cd/SHA256SUMS.sign
+#+end_src
+
+** Check the integrity of the iso
+
+#+begin_src bash :export both
+sha256sum -c SHA256SUMS --ignore-missing
+#+end_src
+
+#+RESULTS:
+: debian-12.6.0-amd64-netinst.iso: OK
+
+** Authenticate the iso
+
+If you do not have the signing key, you can import it with :
+#+begin_src bash
+gpg --keyserver keyring.debian.org --recv DF9B9C49EAA9298432589D76DA87E80D6294BE9B
+#+end_src
+
+#+begin_src bash :results pp :export both
+gpg --verify SHA256SUMS.sign SHA256SUMS
+#+end_src
+
+#+RESULTS:
+: gpg: assuming signed data in 'SHA256SUMS'
+: gpg: Signature made Sat 29 Jun 2024 10:50:21 PM CEST
+: gpg:                using RSA key DF9B9C49EAA9298432589D76DA87E80D6294BE9B
+: gpg: Good signature from "Debian CD signing key <debian-cd@lists.debian.org>" [unknown]
+: gpg: WARNING: This key is not certified with a trusted signature!
+: gpg:          There is no indication that the signature belongs to the owner.
+: Primary key fingerprint: DF9B 9C49 EAA9 2984 3258  9D76 DA87 E80D 6294 BE9B
+
+** Generate your iso
+
+#+begin_src bash :eval no :exports code
+./make-preseed-iso.sh --preseed vmware --output vm-debian-12.6.0-amd64-netinst.iso debian-12.6.0-amd64-netinst.iso
+./make-preseed-iso.sh --preseed headless --output headless-debian-12.6.0-amd64-netinst.iso debian-12.6.0-amd64-netinst.iso
+
+# Generate a qubes static netinst with '1234' password for root:
+root_sha512='$6$0i3EFbGpyaYqA6Fa$83jUD3SppA1FFJC4AlvAx/saBjUD/CmupQH.P6wNt5yi9zXNo0fqO/rEqchUxYlRPKjvdbXmSFN7vq3AmzEYN1' \
+           ./make-preseed-iso.sh --debug --force --preseed qubes/preseed.cfg \
+           --ip-address 10.137.0.130 --netmask 255.0.0.0 --gateway 10.138.30.105 \
+           --nameservers 10.139.1.1 --domain lan --hostname debian-12-preseed \
+           debian-12.5.0-amd64-netinst.iso
+#+end_src
+
+Notice that [[file:common/scripts/late_command.sh][late_command.sh]] will include the ./private/authorized_keys into the
+=~/.ssh= of your user or root.  It will also look for =./private/default/grub=,
+=./private/default/keyboard=, =./private/default/console-setup=, drop them in
+=/etc/default/= and reconfigure the corresponding packages if necessary.
+
+This is done to circumvent some pain points of locale configuration and to allow
+better customization.  But keep in mind that the configuration of your server
+belongs moreover to proper tools such as =Ansible=, =puppet=, =chef=, =saltstack=, and
+the =preseed.cfg= is rather about bootstrapping your partitions and ssh server.
+
+* Pre-seed examples
+
+All =preseed.cfg= options: <https://preseed.debian.net/debian-preseed/>.
+
+** headless_bios
+
+A server with the partitioning recommended by the CIS, with a GPT table and with
+a 'BIOS boot' partition.  It should work with BIOS or UEFI in legacy mode.
+
+** headless_uefi_crypt
+
+A server with the partitioning recommended by the CIS, with a GPT table and with
+a =/boot/EFI= partition.  It should work with UEFI.  The main partitions are
+encrypted and you will be prompted for the passphrase.
+
+** gnome
+
+A simple GNOME desktop with encrypted multi partitioning, GPT, a =/boot/EFI= and
+firmwares packages.
+
+** qubes
+
+A test area for testing the recipes with QubesOS.

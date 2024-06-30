@@ -311,8 +311,8 @@ Usage: $(basename "$0") path/to/debian.iso
 
   All options can be set via environment variables.
 
-  Notably root_sha512 and user_sha512 can be set from the environment and be
-  used as crypted password information.
+  Notably root_sha512 and user_sha512 have no CLI flags but can be used as
+  crypted password information.
 
   To generate them, use:
     # openssl passwd -6
