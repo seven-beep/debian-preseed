@@ -9,7 +9,7 @@ isofiles="${workdir}/CD1"
 function extract_iso() {
   echo "Extracting iso: $1..."
   [ -e "$isofiles" ] && { chmod +w -R "$isofiles" && rm -fr "$isofiles"; }
-  mkdir "$isofiles"
+  mkdir -pv "$isofiles"
   xorriso -osirrox on -indev "$1" -extract / "$isofiles"
 }
 
@@ -391,7 +391,7 @@ fi
 
 
 validate_network_options
-#extract_iso "$orig_iso"
+extract_iso "$orig_iso"
 init_workdir  "$preseed_cfg"
 build_network_cfg
 build_hostname_cfg
@@ -403,5 +403,5 @@ make_auto_the_default_grub_boot_option
 include_grub_debug_flag
 update_md5_checksum
 generate_new_iso "$orig_iso" "$new_iso"
-#cleanup
+cleanup
 echo "${new_iso}: DONE"
