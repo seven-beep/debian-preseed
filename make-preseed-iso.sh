@@ -111,7 +111,7 @@ EOF
         user_sha512=$(openssl passwd -6 -noverify)
       fi
     cat >> "$workdir/preseed/preseed.cfg" <<EOF
-d-i passwd/root-password-crypted password $user_sha512
+d-i passwd/user-password-crypted password $user_sha512
 EOF
     else
       cat >> "$workdir/preseed/preseed.cfg" <<EOF
