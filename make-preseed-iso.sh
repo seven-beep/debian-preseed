@@ -110,9 +110,14 @@ EOF
       if [[ -z "$user_sha512" ]]; then
         user_sha512=$(openssl passwd -6 -noverify)
       fi
-    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+      cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/user-password-crypted password $user_sha512
 EOF
+      if [[ -n "$passwordless_sudo" ]]; then
+      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i custom/passwordless_sudo string true
+EOF
+      fi
     else
       cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/make-user boolean false
@@ -306,6 +311,8 @@ Usage: $(basename "$0") path/to/debian.iso
       Set the domain. If no domain is provided, no domain will be configured.
   -u|--user
       Set the username of the user created.
+  -P|--passwordless-sudo
+      Weither allowing sudo without password for the user.
   -w|--without-root
       Weither or not setting a password on root user.
 
@@ -324,27 +331,28 @@ EOF
 }
 
 
-short='hdp:o:fsi:n:g:N:H:D:u:w'
-long='help,debug,preseed:,output:,force,ip-address:,netmask:,gateway:,nameservers:,hostname:,domain:,user:,without-root'
+short='hdp:o:fsi:n:g:N:H:D:u:Pw'
+long='help,debug,preseed:,output:,force,ip-address:,netmask:,gateway:,nameservers:,hostname:,domain:,user:,passwordless-sudo,without-root'
 opts=$(getopt --options=$short --longoptions=$long --name "$0" -- "$@")
 [[ -n "$opts" ]] && eval set -- "$opts"
 
 while true; do
   case "$1" in
-    -h|--help)            usage               ; shift   ;;
-    -d|--debug)           debug=True          ; shift   ;;
-    -p|--preseed)         preseed_cfg="${2}"  ; shift 2 ;;
-    -o|--output)          new_iso="${2}"      ; shift 2 ;;
-    -f|--force)           force=True          ; shift   ;;
-    -s|--static-network)  static_network=True ; shift   ;;
-    -i|--ip-address)      ip_address=$2       ; shift 2 ;;
-    -n|--netmask)         netmask=$2          ; shift 2 ;;
-    -g|--gateway)         gateway=$2          ; shift 2 ;;
-    -N|--nameservers)     nameservers=$2      ; shift 2 ;;
-    -H|--hostname)        hostname=$2         ; shift 2 ;;
-    -D|--domain)          domain=$2           ; shift 2 ;;
-    -u|--user)            user=$2             ; shift 2 ;;
-    -w|--without-root)    without_root=True   ; shift   ;;
+    -h|--help)              usage                  ; shift   ;;
+    -d|--debug)             debug=True             ; shift   ;;
+    -p|--preseed)           preseed_cfg="${2}"     ; shift 2 ;;
+    -o|--output)            new_iso="${2}"         ; shift 2 ;;
+    -f|--force)             force=True             ; shift   ;;
+    -s|--static-network)    static_network=True    ; shift   ;;
+    -i|--ip-address)        ip_address=$2          ; shift 2 ;;
+    -n|--netmask)           netmask=$2             ; shift 2 ;;
+    -g|--gateway)           gateway=$2             ; shift 2 ;;
+    -N|--nameservers)       nameservers=$2         ; shift 2 ;;
+    -H|--hostname)          hostname=$2            ; shift 2 ;;
+    -D|--domain)            domain=$2              ; shift 2 ;;
+    -u|--user)              user=$2                ; shift 2 ;;
+    -P|--passwordless-sudo) passwordless_sudo=True ; shift   ;;
+    -w|--without-root)      without_root=True      ; shift   ;;
     --) shift ; break ;;
     *) usage 1 ;;
   esac
@@ -373,6 +381,7 @@ hostname="${hostname:-}"
 domain="${domain:=}"
 user="${user:-}"
 user_sha512="${user_sha512:-}"
+passwordless_sudo="${passwordless_sudo:-}"
 without_root="${root:-}"
 root_sha512="${root_sha512:-}"
 

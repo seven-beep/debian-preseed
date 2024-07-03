@@ -35,7 +35,15 @@ logger "Enforcing https in /target/etc/apt/sources.list"
 sed -i 's|http://|https://|g' /target/etc/apt/sources.list
 
 # Aprioris, there is only one user in /home right now.
-user=$(awk -F':' '$6 ~ "^/home" { print $1 }' /etc/passwd)
+user=$(debconf-get passwd/username)
+
+if [ -n "$user" ] && [ $(debconf-get custom/passwordless_sudo) == true ] ; then
+    logger "Enabling passwordless sudo for $user"
+    in-target usermod "$user" -aG sudo
+    echo "$user ALL=(ALL) NOPASSWD: ALL" >  "/target/etc/sudoers.d/$user";
+    # Ensure sudo is installed:
+    in-target apt install sudo -y
+fi
 
 if [ -f /private/authorized_keys ]; then
     logger "Setting up authorized_keys"
@@ -48,8 +56,6 @@ if [ -f /private/authorized_keys ]; then
         mv --verbose /private/authorized_keys "/target/home/$user/.ssh/"
         chmod 0600 "/target/home/$user/.ssh/"
         chown "$user:$user" -R "/target/home/$user/.ssh"
-        logger "Enabling passwordless sudo for $user"
-        echo "$user ALL=(ALL) NOPASSWD: ALL" >  "/target/etc/sudoers.d/$user";
     else
         mkdir --parent --verbose /target/root/.ssh
         chmod 0700 /target/root/.ssh
