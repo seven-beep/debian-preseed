@@ -37,7 +37,7 @@ sed -i 's|http://|https://|g' /target/etc/apt/sources.list
 # Aprioris, there is only one user in /home right now.
 user=$(debconf-get passwd/username)
 
-if [ -n "$user" ] && [ $(debconf-get custom/passwordless_sudo) == true ] ; then
+if [ -n "$user" ] && [ "$(debconf-get custom/passwordless_sudo)" = true ] ; then
     logger "Enabling passwordless sudo for $user"
     in-target usermod "$user" -aG sudo
     echo "$user ALL=(ALL) NOPASSWD: ALL" >  "/target/etc/sudoers.d/$user";
@@ -51,16 +51,18 @@ if [ -f /private/authorized_keys ]; then
     # Assuming that you want the keys in for your user if you created it,
     # or for root if you didn't created it.
     if [ -n "$user" ]; then
-        mkdir --parent --verbose --directory "/target/home/$user/.ssh"
+        mkdir --parent --verbose "/target/home/$user/.ssh"
         chmod 0700 "/target/home/$user/.ssh"
         mv --verbose /private/authorized_keys "/target/home/$user/.ssh/"
-        chmod 0600 "/target/home/$user/.ssh/"
-        chown "$user:$user" -R "/target/home/$user/.ssh"
+        chmod 0600 "/target/home/$user/.ssh/authorized_keys"
+        in-target chown "$user:$user" -R "/home/$user/.ssh"
     else
         mkdir --parent --verbose /target/root/.ssh
         chmod 0700 /target/root/.ssh
+        chown 0:0 /target/root/.ssh
         mv --verbose /private/authorized_keys /target/root/.ssh/authorized_keys
         chmod 0600 /target/root/.ssh/authorized_keys
+        chown 0:0 /target/root/.ssh/authorized_keys
     fi
 fi
 
