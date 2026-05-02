@@ -91,7 +91,12 @@ function build_users() {
   cat >> "$workdir/preseed/preseed.cfg" <<EOF
 # USERS
 EOF
-  if [[ "$without_root" != False ]]; then
+  if [[ "$without_root" == True ]]; then
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+d-i passwd/root-login boolean False
+d-i passwd/root-password-crypted password
+EOF
+  else
     cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/root-login boolean True
 EOF
@@ -101,35 +106,35 @@ EOF
     cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/root-password-crypted password $root_sha512
 EOF
+fi
 
     # Assuming you want the same full name as your login,
     # Assuming you want uid 1000,
     # Assuming you do not require groups :
     # d-i passwd/user-default-groups string [groups]
-    if [[ -n "$user" ]]; then
-      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+if [[ -n "$user" ]]; then
+   cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/make-user boolean true
 d-i passwd/user-fullname string $user
 d-i passwd/username string $user
 d-i passwd/user-uid string 1000
 EOF
-      if [[ -z "$user_sha512" ]]; then
-        user_sha512=$(openssl passwd -6 -noverify)
-      fi
-      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+   if [[ -z "$user_sha512" ]]; then
+      user_sha512=$(openssl passwd -6 -noverify)
+   fi
+   cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/user-password-crypted password $user_sha512
 EOF
-      if [[ -n "$passwordless_sudo" ]]; then
-      cat >> "$workdir/preseed/preseed.cfg" <<EOF
+   if [[ -n "$passwordless_sudo" ]]; then
+     cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i custom/passwordless_sudo string true
 EOF
-      fi
-    else
+    fi
+else
       cat >> "$workdir/preseed/preseed.cfg" <<EOF
 d-i passwd/make-user boolean false
 EOF
-    fi
-  fi
+fi
 }
 
 function add_to_initrd() {
@@ -388,7 +393,7 @@ domain="${domain:=}"
 user="${user:-}"
 user_sha512="${user_sha512:-}"
 passwordless_sudo="${passwordless_sudo:-}"
-without_root="${root:-}"
+without_root="${without_root:-False}"
 root_sha512="${root_sha512:-}"
 
 echo "source: $orig_iso"
