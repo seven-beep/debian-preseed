@@ -21,13 +21,16 @@ if command -v lvs > /dev/null; then
        done
    fi
 
-   if lvs | awk '{ print $2 }' | grep -Evq '^var$'; then
-       logger "Enable and configure a tmpfs for /tmp as it was not partitionned"
-       cp -v /target/usr/share/systemd/tmp.mount /target/etc/systemd/system/tmp.mount
-       # Enforce noexec on /tmp
-       sed -ri 's/(Options.*)/\1,noexec/' /target/etc/systemd/system/tmp.mount
-       mkdir -vp /target/etc/systemd/system/local-fs.target.wants/
-       ln -fs /target/etc/systemd/system/tmp.mount /target/etc/systemd/system/local-fs.target.wants/tmp.mount
+   if ! awk '{ print $2 }' /target/etc/fstab | grep -Eq '^/tmp$'; then
+       logger "Try to configure a tmpfs for /tmp as it was not detected in /etc/fstab"
+       # Starting from Debian 13, /tmp is already a tmpfs.
+       if [ -f /target/usr/share/systemd/tmp.mount ] ; then
+           cp -v /target/usr/share/systemd/tmp.mount /target/etc/systemd/system/tmp.mount
+           # Enforce noexec on /tmp
+           sed -ri 's/(Options.*)/\1,noexec/' /target/etc/systemd/system/tmp.mount
+           mkdir -vp /target/etc/systemd/system/local-fs.target.wants/
+           ln -fs /target/etc/systemd/system/tmp.mount /target/etc/systemd/system/local-fs.target.wants/tmp.mount
+       fi
    fi
 fi
 
