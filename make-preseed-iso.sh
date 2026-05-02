@@ -64,11 +64,17 @@ EOF
 }
 
 function build_hostname_cfg() {
-  if [[ -v hostname ]] ; then
+  if [[ -n "$hostname" ]] ; then
     cat >> "$workdir/preseed/preseed.cfg" <<EOF
 # Hostname
 d-i netcfg/hostname string $hostname
 d-i netcfg/get_hostname string $hostname
+EOF
+  else
+    cat >> "$workdir/preseed/preseed.cfg" <<EOF
+# Hostname
+d-i netcfg/hostname string debian
+d-i netcfg/get_hostname string debian
 EOF
   fi
 }
